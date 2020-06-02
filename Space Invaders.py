@@ -4,15 +4,17 @@ from os import chdir
 from random import randint
 from random import choice
 from math import hypot
-from pip._vendor.distlib.compat import raw_input
+import shelve
 
 pygame.init()
 
 # Changing working directory to allow pictures to be loaded - Moved files, making this step a necessity
 chdir('Space Game')
 
-
 difficulty = 'E'
+
+high_score = 0
+score_to_add = 0
 
 # # Asking for difficulty
 # difficulty = raw_input(
@@ -39,6 +41,7 @@ bullet_fire = pygame.mixer.Sound('bullet_fire.wav')
 explosion = pygame.mixer.Sound('explosion.wav')
 pygame.mixer.music.load('background_music.wav')  # Loading in music as object, no variable needed
 trumpetGameOver = pygame.mixer.Sound('trumpetGameOver.wav')
+click = pygame.mixer.Sound('click.wav')
 played_already = False  # Variable to stop multiple playbacks of trumpet sound
 # Playing music on loop using -1 as a parameter
 pygame.mixer.music.play(-1)
@@ -243,10 +246,21 @@ enemies = [space_invader, space_invader2, space_invader3, space_invader4, space_
 
 # Displaying score text on screen
 score_value = 0  # Creating variable for value of score to use for displaying
-font_for_score = pygame.font.Font('OpenSans-Regular.ttf', 28)  # Creating variable for font and it's size
+arcade_font_score = pygame.font.Font('ARCADE_N.TTF', 28)  # Creating variable for font and it's size
+arcade_font_difficulty = pygame.font.Font('ARCADE_N.TTF', 32)
+difficulty_text = arcade_font_difficulty.render('Choose your difficulty:', True, (255, 255, 255))
 
 # Loading in game-over.png as PyGame surface
 game_over_image = pygame.image.load('game-over.png')
+
+translucent_bg = pygame.image.load('background_translucent.png')
+paused_text = arcade_font_difficulty.render('Paused', True, (255, 255, 255))
+
+winner_image = pygame.image.load('winner.png')
+winner_image_x = 1000
+winner_image_y = 50
+winner_image_vel = -20
+win_audio = pygame.mixer.Sound('winner_audio.wav')
 
 # Assigning variables for game-over image coordinates
 game_over_x = 273
@@ -262,7 +276,7 @@ intro_title_y = 187
 def display_score():
     # Creating variable for PyGame surface. Contains text rendered using our loaded font variable
     # Assigning values for text we want used, antialias boolean and color
-    score = font_for_score.render("Score: " + str(score_value), True, (255, 255, 255))
+    score = arcade_font_score.render("Score: " + str(score_value), True, (255, 255, 255))
     # Drawing score surface onto screen
     screen.blit(score, (10, 10))
 
@@ -275,27 +289,70 @@ def check_position(enemy):
 
 
 already_done = False  # Variable to prevent repeated subtraction from quit_button.x
+winner_played = False
+buttons_changed = False
+
+controls_font = pygame.font.Font('OpenSans-Bold.ttf', 14)
+controls_text = controls_font.render('Controls:', True, (255, 255, 255))
+left_arrow = controls_font.render('Left Arrow - Move Left', True, (255, 255, 255))
+right_arrow = controls_font.render('Right Arrow - Move Right', True, (255, 255, 255))
+space_controls = controls_font.render('Space - Shoot', True, (255, 255, 255))
+escape = controls_font.render('ESC - Pause', True, (255, 255, 255))
+mouse_controls = controls_font.render('Mouse to click buttons', True, (255, 255, 255))
+
 
 
 # Defining function to draw game window
 def drawGameWindow():
     global already_done
-    if not past_start_screen:
+    global winner_played
+    global buttons_changed
+    if not past_start_screen and not pause and not game_won:
         screen.blit(bg, (0, 0))
         screen.blit(intro_title, (intro_title_x, intro_title_y))
         start_game_button.draw_button()
         quit_button.draw_button()
         pygame.display.update()
-    if past_start_screen and not game_begun:
+    if past_start_screen and not game_begun and not pause and not game_won:
         screen.blit(bg, (0, 0))
+        screen.blit(difficulty_text, (60, 250))
+        screen.blit(controls_text, (374, 50))
+        screen.blit(left_arrow, (333, 70))
+        screen.blit(right_arrow, (326, 90))
+        screen.blit(space_controls, (366, 110))
+        screen.blit(escape, (366, 130))
+        screen.blit(mouse_controls, (331, 150))
         easy.draw_button()
         intermediate.draw_button()
         hard.draw_button()
         pygame.display.update()
-    if past_start_screen and game_begun:
+    if pause and not game_over and not game_won:
+        screen.blit(paused_text, (300, 280))
+        pygame.display.update()
+    if game_won:
+        screen.blit(bg, (0, 0))
+        screen.blit(winner_image, (winner_image_x, winner_image_y))
+        # screen.blit(high_score_text, (200, 460))
+        spaceship.draw_player()
+        if not buttons_changed:
+            play_again_button.x -= 100
+            play_again_button.y -= 50
+            play_again_button.text_x -= 100
+            play_again_button.text_y -= 50
+            quit_button.x -= 40
+            quit_button.y -= 50
+            quit_button.text_x -= 40
+            quit_button.text_y -= 50
+            buttons_changed = True
+        play_again_button.draw_button()
+        quit_button.draw_button()
+        display_score()
+        pygame.display.update()
+    if past_start_screen and game_begun and not pause and not game_won:
         # Bringing game over screen if game_over
         if game_over:
             screen.blit(bg, (0, 0))
+            # screen.blit(high_score_text, (200, 480))
             if game_over_y > 210:
                 if not already_done:
                     quit_button.x -= 100
@@ -328,6 +385,7 @@ game_begun = False
 played_again = False
 past_start_screen = False
 already_changed = False
+pause = False
 run = True
 while run:
     clock.tick(45)  # Using clock to not allow more than 45 iterations a second
@@ -339,32 +397,41 @@ while run:
         mouse_pos = pygame.mouse.get_pos()
         if event.type == pygame.MOUSEBUTTONDOWN:
             if start_game_button.mouse_is_over(mouse_pos) and not past_start_screen and not game_over:
+                click.play()
                 past_start_screen = True
-            if quit_button.mouse_is_over(mouse_pos) and not game_begun or game_over:
+            if quit_button.mouse_is_over(mouse_pos) and not game_begun or game_over or game_won:
+                click.play()
                 if not play_again_button.mouse_is_over(mouse_pos):
                     run = False
-            if play_again_button.mouse_is_over(mouse_pos) and game_over:
+            if play_again_button.mouse_is_over(mouse_pos) and game_over or game_won:
+                click.play()
                 for enemy in enemies:
                     enemy.lives = enemy.lives2
                     enemy.x = randint(50, 700)
                     enemy.y = randint(20, 151)
                     enemy.is_bullet_collision = False
                 score_value = 0
-                game_begun = True
+                game_begun = False
                 game_over = False
+                game_won = False
                 played_again = True
-            if easy.mouse_is_over(mouse_pos) and past_start_screen and not intermediate.mouse_is_over(mouse_pos) and not hard.mouse_is_over(mouse_pos):
+            if easy.mouse_is_over(mouse_pos) and past_start_screen and not intermediate.mouse_is_over(
+                    mouse_pos) and not hard.mouse_is_over(mouse_pos):
+                click.play()
                 difficulty = 'E'
                 game_begun = True
 
-            if intermediate.mouse_is_over(mouse_pos) and past_start_screen and not easy.mouse_is_over(mouse_pos) and not hard.mouse_is_over(mouse_pos):
+            if intermediate.mouse_is_over(mouse_pos) and past_start_screen and not easy.mouse_is_over(
+                    mouse_pos) and not hard.mouse_is_over(mouse_pos):
+                click.play()
                 difficulty = 'I'
                 game_begun = True
 
-            if hard.mouse_is_over(mouse_pos) and past_start_screen and not easy.mouse_is_over(mouse_pos) and not intermediate.mouse_is_over(mouse_pos):
+            if hard.mouse_is_over(mouse_pos) and past_start_screen and not easy.mouse_is_over(
+                    mouse_pos) and not intermediate.mouse_is_over(mouse_pos):
+                click.play()
                 difficulty = 'H'
                 game_begun = True
-
 
     for enemy in enemies:
         if not already_changed:
@@ -380,6 +447,16 @@ while run:
         enemy.lives2 = enemy.lives
         already_changed = True
 
+    keys = pygame.key.get_pressed()  # Creating a tuple of all the keys that are pressed, every iteration
+    if keys[pygame.K_ESCAPE]:
+        if pause:
+            pause = False
+            pygame.mixer.music.unpause()
+            pygame.time.wait(200)
+        else:
+            pygame.mixer.music.pause()
+            pause = True
+            pygame.time.wait(200)
 
     if game_over:
         if not played_already:
@@ -389,14 +466,21 @@ while run:
         if game_over_y < game_over_final_y:
             game_over_y += 20
 
-    if game_begun and not game_over:
+    if game_won:
+        if not winner_played:
+            pygame.mixer.music.pause()
+            win_audio.play()
+            winner_played = True
+        if winner_image_x > 50:
+            winner_image_x += winner_image_vel
+
+    if game_begun and not game_over and not pause and not game_won:
         if played_again:
             pygame.mixer.music.unpause()
             game_over_y = -200
             played_already = False
             played_again = False
 
-        keys = pygame.key.get_pressed()  # Creating a tuple of all the keys that are pressed, every iteration
         if keys[pygame.K_RIGHT]:  # Checking if right key was pressed
             if spaceship.x < (800 - spaceship.width - 4):
                 spaceship.move_right()  # Using method to move spaceship right
@@ -444,5 +528,3 @@ while run:
     drawGameWindow()
 
 pygame.quit()
-
-print(difficulty)
