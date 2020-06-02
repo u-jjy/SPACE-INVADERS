@@ -11,12 +11,15 @@ pygame.init()
 # Changing working directory to allow pictures to be loaded - Moved files, making this step a necessity
 chdir('Space Game')
 
-# Asking for difficulty
-difficulty = raw_input(
-    'Choose your difficulty level:\nEnter E for easy\nEnter I for intermediate\nEnter H for hard\n').upper()
-while difficulty != 'E' and difficulty != 'I' and difficulty != 'H':
-    difficulty = raw_input(
-        'Choose your difficulty level:\nEnter E for easy\nEnter I for intermediate\nEnter H for hard\n').upper()
+
+difficulty = 'E'
+
+# # Asking for difficulty
+# difficulty = raw_input(
+#     'Choose your difficulty level:\nEnter E for easy\nEnter I for intermediate\nEnter H for hard\n').upper()
+# while difficulty != 'E' and difficulty != 'I' and difficulty != 'H':
+#     difficulty = raw_input(
+#         'Choose your difficulty level:\nEnter E for easy\nEnter I for intermediate\nEnter H for hard\n').upper()
 
 # Setting screen dimension variables and creating a screen variable
 screen_width = 800
@@ -140,9 +143,6 @@ class Enemy:
                 pygame.mixer.Sound.play(explosion)
                 score_value += 1
                 self.respawn()
-
-    def reset(self):
-        self.lives = self.lives2
 
 
 # Bullet class, attributes and methods
@@ -280,16 +280,19 @@ already_done = False  # Variable to prevent repeated subtraction from quit_butto
 # Defining function to draw game window
 def drawGameWindow():
     global already_done
-    if not game_begun:
+    if not past_start_screen:
         screen.blit(bg, (0, 0))
         screen.blit(intro_title, (intro_title_x, intro_title_y))
         start_game_button.draw_button()
         quit_button.draw_button()
+        pygame.display.update()
+    if past_start_screen and not game_begun:
+        screen.blit(bg, (0, 0))
         easy.draw_button()
         intermediate.draw_button()
         hard.draw_button()
         pygame.display.update()
-    else:
+    if past_start_screen and game_begun:
         # Bringing game over screen if game_over
         if game_over:
             screen.blit(bg, (0, 0))
@@ -323,6 +326,8 @@ game_won = False
 game_over = False
 game_begun = False
 played_again = False
+past_start_screen = False
+already_changed = False
 run = True
 while run:
     clock.tick(45)  # Using clock to not allow more than 45 iterations a second
@@ -333,8 +338,8 @@ while run:
 
         mouse_pos = pygame.mouse.get_pos()
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if start_game_button.mouse_is_over(mouse_pos) and not game_begun and not game_over:
-                game_begun = True
+            if start_game_button.mouse_is_over(mouse_pos) and not past_start_screen and not game_over:
+                past_start_screen = True
             if quit_button.mouse_is_over(mouse_pos) and not game_begun or game_over:
                 if not play_again_button.mouse_is_over(mouse_pos):
                     run = False
@@ -348,6 +353,33 @@ while run:
                 game_begun = True
                 game_over = False
                 played_again = True
+            if easy.mouse_is_over(mouse_pos) and past_start_screen and not intermediate.mouse_is_over(mouse_pos) and not hard.mouse_is_over(mouse_pos):
+                difficulty = 'E'
+                game_begun = True
+
+            if intermediate.mouse_is_over(mouse_pos) and past_start_screen and not easy.mouse_is_over(mouse_pos) and not hard.mouse_is_over(mouse_pos):
+                difficulty = 'I'
+                game_begun = True
+
+            if hard.mouse_is_over(mouse_pos) and past_start_screen and not easy.mouse_is_over(mouse_pos) and not intermediate.mouse_is_over(mouse_pos):
+                difficulty = 'H'
+                game_begun = True
+
+
+    for enemy in enemies:
+        if not already_changed:
+            if difficulty == 'E':
+                enemy.y_vel = 0.3
+                enemy.lives = 2
+            if difficulty == 'I':
+                enemy.y_vel = 0.5
+                enemy.lives = 3
+            if difficulty == 'H':
+                enemy.y_vel = 0.7
+                enemy.lives = 4
+        enemy.lives2 = enemy.lives
+        already_changed = True
+
 
     if game_over:
         if not played_already:
@@ -359,7 +391,6 @@ while run:
 
     if game_begun and not game_over:
         if played_again:
-            print('POOP')
             pygame.mixer.music.unpause()
             game_over_y = -200
             played_already = False
@@ -413,3 +444,5 @@ while run:
     drawGameWindow()
 
 pygame.quit()
+
+print(difficulty)
