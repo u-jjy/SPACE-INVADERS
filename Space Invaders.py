@@ -141,6 +141,9 @@ class Enemy:
                 score_value += 1
                 self.respawn()
 
+    def reset(self):
+        self.lives = self.lives2
+
 
 # Bullet class, attributes and methods
 class Bullet:
@@ -227,6 +230,11 @@ bullet = Bullet()
 start_game_button = Button(200, 430, (0, 255, 0), 'Start Game', 206, 440)
 quit_button = Button(530, 430, (255, 0, 0), 'Quit Game', 533, 440)
 play_again_button = Button(300, 430, (0, 255, 0), 'Play Again', 306, 440)
+easy = Button(350, 310, (0, 255, 0), 'Easy', 385, 320)
+intermediate = Button(350, 360, (0, 255, 0), 'Intermediate', 356, 370)
+hard = Button(350, 410, (0, 255, 0), 'Hard', 385, 420)
+easy.width = 108  # Changing button width to equal all three button widths
+hard.width = 108
 
 # List of enemies
 enemies = [space_invader, space_invader2, space_invader3, space_invader4, space_invader5, space_invader6,
@@ -277,6 +285,9 @@ def drawGameWindow():
         screen.blit(intro_title, (intro_title_x, intro_title_y))
         start_game_button.draw_button()
         quit_button.draw_button()
+        easy.draw_button()
+        intermediate.draw_button()
+        hard.draw_button()
         pygame.display.update()
     else:
         # Bringing game over screen if game_over
@@ -328,9 +339,13 @@ while run:
                 if not play_again_button.mouse_is_over(mouse_pos):
                     run = False
             if play_again_button.mouse_is_over(mouse_pos) and game_over:
-                # for enemy in enemies:
-                #     enemy.lives = enemy.lives2
-                # score_value = 0
+                for enemy in enemies:
+                    enemy.lives = enemy.lives2
+                    enemy.x = randint(50, 700)
+                    enemy.y = randint(20, 151)
+                    enemy.is_bullet_collision = False
+                score_value = 0
+                game_begun = True
                 game_over = False
                 played_again = True
 
@@ -344,10 +359,8 @@ while run:
 
     if game_begun and not game_over:
         if played_again:
+            print('POOP')
             pygame.mixer.music.unpause()
-            for enemy in enemies:
-                enemy.respawn()
-            dead = 0
             game_over_y = -200
             played_already = False
             played_again = False
@@ -396,7 +409,6 @@ while run:
 
         if dead == 15:  # Checking if all enemies are dead
             game_won = True  # Making game won true
-
 
     drawGameWindow()
 
